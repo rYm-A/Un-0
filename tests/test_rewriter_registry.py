@@ -133,3 +133,38 @@ def test_compile_model_wrapper() -> None:
     x = torch.randn(2, 4)
     out = compiled(x)
     assert out.shape == (2, 2)
+
+
+def test_functional_hop_kuramoto_dynamics() -> None:
+    from un0.compiler import FunctionalHOPKuramotoDynamics, functionalize_kuramoto_model
+
+    dynamics = ConditionalKuramotoDynamics(
+        n_oscillators=4,
+        n_conditional_oscillators=2,
+        num_classes=2,
+    )
+
+    hop_rk4 = functionalize_kuramoto_model(dynamics, solver_name="rk4", num_steps=3, dt=0.1)
+    state = torch.randn(2, dynamics.state_dim)
+    drive = torch.randn(2, dynamics.n, dynamics.n_cond)
+
+    out = hop_rk4(state, drive)
+    assert out.shape == (2, dynamics.state_dim)
+    assert not torch.isnan(out).any()
+
+    # Dynamic batch verification: batch size 1 and batch size 5
+    state_b1 = torch.randn(1, dynamics.state_dim)
+    drive_b1 = torch.randn(1, dynamics.n, dynamics.n_cond)
+    out_b1 = hop_rk4(state_b1, drive_b1)
+    assert out_b1.shape == (1, dynamics.state_dim)
+
+    state_b5 = torch.randn(5, dynamics.state_dim)
+    drive_b5 = torch.randn(5, dynamics.n, dynamics.n_cond)
+    out_b5 = hop_rk4(state_b5, drive_b5)
+    assert out_b5.shape == (5, dynamics.state_dim)
+
+    # Test Euler solver
+    hop_euler = functionalize_kuramoto_model(dynamics, solver_name="euler", num_steps=3, dt=0.1)
+    out_euler = hop_euler(state, drive)
+    assert out_euler.shape == (2, dynamics.state_dim)
+
