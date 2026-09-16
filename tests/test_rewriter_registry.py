@@ -168,3 +168,28 @@ def test_functional_hop_kuramoto_dynamics() -> None:
     out_euler = hop_euler(state, drive)
     assert out_euler.shape == (2, dynamics.state_dim)
 
+
+def test_compiler_registry_builtins_and_custom() -> None:
+    from un0.compiler import (
+        COMPILER_REGISTRY,
+        get_compiler_rewrite,
+        register_compiler_rewrite,
+    )
+
+    assert "hop_while_loop" in COMPILER_REGISTRY
+    assert "unrolled_functional" in COMPILER_REGISTRY
+
+    hop_fn = get_compiler_rewrite("hop_while_loop")
+    assert callable(hop_fn)
+
+    # Register custom rewrite
+    @register_compiler_rewrite("test_custom_compiler_rewrite")
+    def custom_rewrite(model, **kwargs):
+        return model
+
+    assert "test_custom_compiler_rewrite" in COMPILER_REGISTRY
+    assert get_compiler_rewrite("test_custom_compiler_rewrite") is custom_rewrite
+
+    with pytest.raises(KeyError, match="not found in registry"):
+        get_compiler_rewrite("non_existent_compiler_rewrite")
+
