@@ -65,8 +65,12 @@ class FunctionalHOPKuramotoDynamics(nn.Module):
 
         # Expose attributes of underlying dynamics (n, n_cond, state_dim, num_classes, etc.)
         for attr in ("n", "n_cond", "state_dim", "num_classes", "omega", "K", "K_drive"):
-            if hasattr(dynamics, attr):
-                setattr(self, attr, getattr(dynamics, attr))
+            curr = dynamics
+            while curr is not None:
+                if hasattr(curr, attr):
+                    setattr(self, attr, getattr(curr, attr))
+                    break
+                curr = getattr(curr, "dynamics", None)
 
     def _step_euler(
         self,

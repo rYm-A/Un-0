@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 import torch
 from torch import Tensor, nn
 from . import register_noise_model
@@ -33,6 +33,14 @@ class L2FunctionalInterfaceNoise(nn.Module):
         self.dac_bits = int(dac_bits)
         self.adc_bits = int(adc_bits)
         self.clip_min, self.clip_max = clip_range
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            if "dynamics" in self.__dict__:
+                return getattr(self.dynamics, name)
+            raise
 
     def forward(self, state: Tensor, t: Tensor, drive: Tensor) -> Tensor:
         # DAC quantization on state and drive

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 import torch
 from torch import Tensor, nn
 from . import register_noise_model
@@ -17,6 +17,14 @@ class L1StochasticParameterNoise(nn.Module):
         super().__init__()
         self.dynamics = dynamics
         self.sigma = float(sigma)
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            if "dynamics" in self.__dict__:
+                return getattr(self.dynamics, name)
+            raise
 
     def forward(self, state: Tensor, t: Tensor, drive: Tensor) -> Tensor:
         vel = self.dynamics(state, t, drive)

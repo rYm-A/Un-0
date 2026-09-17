@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 import torch
 from torch import Tensor, nn
 from . import register_noise_model
@@ -17,14 +17,34 @@ class L0StaticMismatchNoise(nn.Module):
         super().__init__()
         self.dynamics = dynamics
         self.sigma = float(sigma)
-        self.register_buffer("static_mismatch", None, persistent=False)
+
+        dim = None
+        curr = dynamics
+        while curr is not None:
+            if hasattr(curr, "state_dim") and isinstance(getattr(curr, "state_dim"), int):
+                dim = getattr(curr, "state_dim")
+                break
+            if hasattr(curr, "n") and isinstance(getattr(curr, "n"), int):
+                dim = getattr(curr, "n") + getattr(curr, "n_cond", 0)
+                break
+            curr = getattr(curr, "dynamics", None)
+
+        if dim is not None:
+            self.register_buffer("static_mismatch", torch.zeros(1, dim), persistent=False)
+        else:
+            self.register_buffer("static_mismatch", None, persistent=False)
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            if "dynamics" in self.__dict__:
+                return getattr(self.dynamics, name)
+            raise
 
     def forward(self, state: Tensor, t: Tensor, drive: Tensor) -> Tensor:
         vel = self.dynamics(state, t, drive)
-        if (
-            self.static_mismatch is None
-            or self.static_mismatch.shape != vel.shape
-            or self.static_mismatch.device != vel.device
-        ):
-            self.static_mismatch = torch.randn_like(vel) * self.sigma
-        return vel + self.static_mismatch
+        if self.static_mismatch is not None and self.static_mismatch.shape[-1] == vel.shape[-1]:
+            return vel + self.static_mismatch.to(device=vel.device, dtype=vel.dtype)
+        mismatch = torch.randn(1, vel.shape[-1], device=vel.device, dtype=vel.dtype) * self.sigma
+        return vel + mismatch
