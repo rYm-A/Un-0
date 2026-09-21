@@ -38,6 +38,9 @@ def compile_model(
         except Exception as dev_err:
             logger.warning("Could not move model to target device '%s': %s", target_device, dev_err)
 
+    if hasattr(model, "eval") and callable(getattr(model, "eval")):
+        model.eval()
+
     # Configure Torch Dynamo optimizations for HOP and scalar captures
     try:
         torch._dynamo.config.capture_scalar_outputs = True
