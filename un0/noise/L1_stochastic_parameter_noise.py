@@ -16,7 +16,7 @@ class L1StochasticParameterNoise(nn.Module):
     def __init__(self, dynamics: nn.Module | Callable, sigma: float = 0.01) -> None:
         super().__init__()
         self.dynamics = dynamics
-        self.sigma = float(sigma)
+        self.register_buffer("sigma", torch.tensor(float(sigma)))
 
     def __getattr__(self, name: str) -> Any:
         try:
@@ -25,6 +25,13 @@ class L1StochasticParameterNoise(nn.Module):
             if "dynamics" in self.__dict__:
                 return getattr(self.dynamics, name)
             raise
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "sigma" and isinstance(value, (int, float)):
+            if "_buffers" in self.__dict__ and "sigma" in self._buffers and self._buffers["sigma"] is not None:
+                self._buffers["sigma"].fill_(float(value))
+                return
+        super().__setattr__(name, value)
 
     def forward(self, state: Tensor, t: Tensor, drive: Tensor) -> Tensor:
         vel = self.dynamics(state, t, drive)
